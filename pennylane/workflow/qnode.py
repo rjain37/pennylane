@@ -1028,14 +1028,20 @@ class QNode:
         )
         self._tape_cached = using_custom_cache and self.tape.hash in cache
 
-        # Add the device program to the QNode program
+        full_transform_program = qml.transforms.core.TransformProgram(self.transform_program)
+        inner_transform_program = qml.transforms.core.TransformProgram()
+        config = None
+
         if isinstance(self.device, qml.devices.Device):
+
             config = _make_execution_config(self, self.gradient_fn)
             device_transform_program, config = self.device.preprocess(execution_config=config)
-            full_transform_program = self.transform_program + device_transform_program
-        else:
-            config = None
-            full_transform_program = qml.transforms.core.TransformProgram(self.transform_program)
+
+            if config.use_device_gradient:
+                full_transform_program += device_transform_program
+            else:
+                inner_transform_program += device_transform_program
+
         has_mcm_support = (
             any(isinstance(op, MidMeasureMP) for op in self._tape)
             and hasattr(self.device, "capabilities")
@@ -1051,6 +1057,7 @@ class QNode:
                 qml.transform(self.gradient_fn.expand_transform),
                 **self.gradient_kwargs,
             )
+
         # Calculate the classical jacobians if necessary
         full_transform_program.set_classical_component(self, args, kwargs)
         full_transform_program.prune_dynamic_transform()
@@ -1062,6 +1069,7 @@ class QNode:
             gradient_fn=self.gradient_fn,
             interface=self.interface,
             transform_program=full_transform_program,
+            inner_transform=inner_transform_program,
             config=config,
             gradient_kwargs=self.gradient_kwargs,
             override_shots=override_shots,
