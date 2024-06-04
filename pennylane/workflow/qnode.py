@@ -1055,7 +1055,7 @@ class QNode:
             and self.device.capabilities().get("supports_mid_measure", False)
         )
         if has_mcm_support:
-            full_transform_program.add_transform(qml.dynamic_one_shot)
+            inner_transform_program.add_transform(qml.dynamic_one_shot)
             override_shots = 1
 
         # Add the gradient expand to the program if necessary
